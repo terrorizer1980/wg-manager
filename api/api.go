@@ -26,6 +26,11 @@ type WireguardPeer struct {
 	Pubkey string `json:"pubkey"`
 }
 
+// ConnectedKeys contain connected keys
+type ConnectedKeys struct {
+	Keys []string `json:"keys"`
+}
+
 // GetWireguardPeers fetches a list of wireguard peers from the API and returns it
 func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
 	req, err := http.NewRequest("GET", a.BaseURL+"/wg/active-pubkeys/v2/", nil)
