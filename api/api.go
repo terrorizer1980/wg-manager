@@ -30,7 +30,7 @@ type WireguardPeer struct {
 // ConnectedKeyList contains connected keys
 type ConnectedKeyList []ConnectedKey
 
-// ConnectedKey contains a wireguard public key and the number of connections using siad key
+// ConnectedKey contains a wireguard public key and the number of connections using said key
 type ConnectedKey struct {
 	Pubkey      string `json:"key"`
 	Connections int    `json:"connections"`
