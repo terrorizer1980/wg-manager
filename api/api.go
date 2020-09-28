@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -62,4 +63,29 @@ func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
 	}
 
 	return decodedResponse, nil
+}
+
+// PostWireguardConnections posts the number of connected wireguard keys to the API
+func (a *API) PostWireguardConnections(keys ConnectedKeysMap) error {
+	buffer := new(bytes.Buffer)
+	json.NewEncoder(buffer).Encode(keys)
+	req, err := http.NewRequest("POST", a.BaseURL+"/internal/wireguard-connection-report/", buffer)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("X-Relay-Hostname", a.Hostname)
+
+	if a.Username != "" && a.Password != "" {
+		req.SetBasicAuth(a.Username, a.Password)
+	}
+
+	response, err := a.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer response.Body.Close()
+
+	return nil
 }
