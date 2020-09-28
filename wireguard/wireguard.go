@@ -201,7 +201,7 @@ func mapExistingPeers(peers []wgtypes.Peer) (peerMap map[wgtypes.Key]wgtypes.Pee
 const handshakeInterval = time.Minute * 2
 
 // How long since a handshake to consider the peer as connected
-const connectedInterval = time.Minute * 5
+const connectedInterval = time.Minute * 3
 
 // Count the connected wireguard peers
 func countConnectedPeers(peers []wgtypes.Peer) (devicePeerCount int, deviceConnectedKeys []wgtypes.Key) {
