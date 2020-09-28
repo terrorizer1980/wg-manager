@@ -27,14 +27,8 @@ type WireguardPeer struct {
 	Pubkey string `json:"pubkey"`
 }
 
-// ConnectedKeyList contains connected keys
-type ConnectedKeyList []ConnectedKey
-
-// ConnectedKey contains a wireguard public key and the number of connections using said key
-type ConnectedKey struct {
-	Pubkey      string `json:"key"`
-	Connections int    `json:"connections"`
-}
+// ConnectedKeysMap contains connected keys and their respective numer of keys
+type ConnectedKeysMap map[string]int
 
 // GetWireguardPeers fetches a list of wireguard peers from the API and returns it
 func (a *API) GetWireguardPeers() (WireguardPeerList, error) {

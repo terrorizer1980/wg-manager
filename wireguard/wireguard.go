@@ -43,13 +43,13 @@ func New(interfaces []string, metrics *statsd.Client) (*Wireguard, error) {
 }
 
 // UpdatePeers updates the configuration of the wireguard interfaces to match the given list of peers
-func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList api.ConnectedKeyList) {
+func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList api.ConnectedKeysMap) {
 	peerMap := w.mapPeers(peers)
 
 	var peerCount, devicePeerCount int
-	connectedKeysMap := make(map[wgtypes.Key]int)
+	connectedKeysMap := make(api.ConnectedKeysMap)
 	for _, d := range w.interfaces {
-		var deviceConnectedKeys []wgtypes.Key
+		var deviceConnectedKeys []string
 
 		device, err := w.client.Device(d)
 		// Log an error, but move on, so that one broken wireguard interface doesn't prevent us from configuring the rest
@@ -154,15 +154,9 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList a
 		}
 	}
 
-	for key, connections := range connectedKeysMap {
-		connectedKeyList = append(connectedKeyList, api.ConnectedKey{
-			Pubkey:      key.String(),
-			Connections: connections,
-		})
-	}
 	// Send metrics
 	w.metrics.Gauge("connected_peers", peerCount)
-	return connectedKeyList
+	return connectedKeysMap
 }
 
 // Take the wireguard peers and convert them into a map for easier comparison
@@ -204,14 +198,14 @@ const handshakeInterval = time.Minute * 2
 const connectedInterval = time.Minute * 3
 
 // Count the connected wireguard peers
-func countConnectedPeers(peers []wgtypes.Peer) (devicePeerCount int, deviceConnectedKeys []wgtypes.Key) {
+func countConnectedPeers(peers []wgtypes.Peer) (devicePeerCount int, deviceConnectedKeys []string) {
 	for _, peer := range peers {
 		lastHandShakeTime := time.Since(peer.LastHandshakeTime)
 		if lastHandShakeTime <= handshakeInterval {
 			devicePeerCount++
 		}
 		if lastHandShakeTime <= connectedInterval {
-			deviceConnectedKeys = append(deviceConnectedKeys, peer.PublicKey)
+			deviceConnectedKeys = append(deviceConnectedKeys, peer.PublicKey.String())
 		}
 	}
 
