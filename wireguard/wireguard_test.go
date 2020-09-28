@@ -138,10 +138,10 @@ func TestWireguard(t *testing.T) {
 	t.Run("check connected keys", func(t *testing.T) {
 		connectedKeys := wg.UpdatePeers(apiFixture)
 
-		expectedKeys := api.ConnectedKeys{
-			Keys: []string{
-				wgClientPrivkey.PublicKey().String(),
-			},
+		expectedKeys := api.ConnectedKeyList{api.ConnectedKey{
+			Pubkey:      wgClientPrivkey.PublicKey().String(),
+			Connections: 1,
+		},
 		}
 
 		if diff := cmp.Diff(expectedKeys, connectedKeys); diff != "" {

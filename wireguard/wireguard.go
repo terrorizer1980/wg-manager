@@ -43,12 +43,14 @@ func New(interfaces []string, metrics *statsd.Client) (*Wireguard, error) {
 }
 
 // UpdatePeers updates the configuration of the wireguard interfaces to match the given list of peers
-func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeys api.ConnectedKeys) {
+func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList api.ConnectedKeyList) {
 	peerMap := w.mapPeers(peers)
 
 	var peerCount, devicePeerCount int
-	var deviceKeys []string
+	connectedKeysMap := make(map[wgtypes.Key]int)
 	for _, d := range w.interfaces {
+		var deviceConnectedKeys []wgtypes.Key
+
 		device, err := w.client.Device(d)
 		// Log an error, but move on, so that one broken wireguard interface doesn't prevent us from configuring the rest
 		if err != nil {
@@ -56,9 +58,17 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeys api.
 			continue
 		}
 
-		devicePeerCount, deviceKeys = countConnectedPeers(device.Peers)
+		devicePeerCount, deviceConnectedKeys = countConnectedPeers(device.Peers)
 		peerCount += devicePeerCount
-		connectedKeys.Keys = append(connectedKeys.Keys, deviceKeys...)
+
+		for _, deviceKey := range deviceConnectedKeys {
+			if _, ok := connectedKeysMap[deviceKey]; !ok {
+				connectedKeysMap[deviceKey] = 1
+			} else {
+				// If the key already exists, count as another connection
+				connectedKeysMap[deviceKey] = connectedKeysMap[deviceKey] + 1
+			}
+		}
 
 		existingPeerMap := mapExistingPeers(device.Peers)
 		cfgPeers := []wgtypes.PeerConfig{}
@@ -144,9 +154,15 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeys api.
 		}
 	}
 
+	for key, connections := range connectedKeysMap {
+		connectedKeyList = append(connectedKeyList, api.ConnectedKey{
+			Pubkey:      key.String(),
+			Connections: connections,
+		})
+	}
 	// Send metrics
 	w.metrics.Gauge("connected_peers", peerCount)
-	return connectedKeys
+	return connectedKeyList
 }
 
 // Take the wireguard peers and convert them into a map for easier comparison
@@ -188,18 +204,18 @@ const handshakeInterval = time.Minute * 2
 const connectedInterval = time.Minute * 5
 
 // Count the connected wireguard peers
-func countConnectedPeers(peers []wgtypes.Peer) (devicePeerCount int, deviceKeys []string) {
+func countConnectedPeers(peers []wgtypes.Peer) (devicePeerCount int, deviceConnectedKeys []wgtypes.Key) {
 	for _, peer := range peers {
 		lastHandShakeTime := time.Since(peer.LastHandshakeTime)
 		if lastHandShakeTime <= handshakeInterval {
 			devicePeerCount++
 		}
 		if lastHandShakeTime <= connectedInterval {
-			deviceKeys = append(deviceKeys, peer.PublicKey.String())
+			deviceConnectedKeys = append(deviceConnectedKeys, peer.PublicKey)
 		}
 	}
 
-	return devicePeerCount, deviceKeys
+	return devicePeerCount, deviceConnectedKeys
 }
 
 // A wireguard session can't last for longer then 3 minutes
