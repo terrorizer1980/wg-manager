@@ -35,6 +35,7 @@ func TestAPI(t *testing.T) {
 		Client:   server.Client(),
 		Username: "foo",
 		Password: "bar",
+		Hostname: "test",
 	}
 
 	peers, err := api.GetWireguardPeers()

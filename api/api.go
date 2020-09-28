@@ -12,6 +12,7 @@ type API struct {
 	Username string
 	Password string
 	BaseURL  string
+	Hostname string
 	Client   *http.Client
 }
 
@@ -33,10 +34,12 @@ type ConnectedKeys struct {
 
 // GetWireguardPeers fetches a list of wireguard peers from the API and returns it
 func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
-	req, err := http.NewRequest("GET", a.BaseURL+"/wg/active-pubkeys/v2/", nil)
+	req, err := http.NewRequest("GET", a.BaseURL+"/internal/active-wireguard-peers/", nil)
 	if err != nil {
 		return WireguardPeerList{}, err
 	}
+
+	req.Header.Add("X-Relay-Hostname", a.Hostname)
 
 	if a.Username != "" && a.Password != "" {
 		req.SetBasicAuth(a.Username, a.Password)
