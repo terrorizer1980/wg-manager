@@ -38,6 +38,7 @@ func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
 		return WireguardPeerList{}, err
 	}
 
+	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-Relay-Hostname", a.Hostname)
 
 	if a.Username != "" && a.Password != "" {
@@ -74,6 +75,7 @@ func (a *API) PostWireguardConnections(keys ConnectedKeysMap) error {
 		return err
 	}
 
+	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-Relay-Hostname", a.Hostname)
 
 	if a.Username != "" && a.Password != "" {
