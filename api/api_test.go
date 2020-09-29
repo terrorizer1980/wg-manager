@@ -27,6 +27,10 @@ var connectedKeysFixture = api.ConnectedKeysMap{
 	strings.Repeat("b", 32): 2,
 }
 
+var connectionsFixture = map[string]api.ConnectedKeysMap{
+	"connections": connectedKeysFixture,
+}
+
 func TestGetWireguardPeers(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		bytes, _ := json.Marshal(peerFixture)
@@ -61,14 +65,14 @@ func TestPostWireguardPeers(t *testing.T) {
 			t.Fatalf(err.Error())
 		}
 
-		var connectedKeys api.ConnectedKeysMap
+		var connectedKeys map[string]api.ConnectedKeysMap
 		err = json.Unmarshal(body, &connectedKeys)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
 
-		if !reflect.DeepEqual(connectedKeys, connectedKeysFixture) {
-			t.Errorf("got unexpected result, wanted %+v, got %+v", connectedKeys, connectedKeysFixture)
+		if !reflect.DeepEqual(connectedKeys, connectionsFixture) {
+			t.Errorf("got unexpected result, wanted %+v, got %+v", connectedKeys, connectionsFixture)
 		}
 
 		rw.WriteHeader(http.StatusOK)
