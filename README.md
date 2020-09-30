@@ -12,15 +12,17 @@ This will produce a `wg-manager` binary and put them in your `GOBIN`.
 
 ## Testing
 To run the tests, run `make test`.
-To run the integration tests as well, run `go test ./...`. Note that this requires WireGuard to be running on the machine, and root privileges.
+
+To run the integration tests as well, look at the `.travis`-file in the repository to see the prerequisite steps to be able to run them. After which you can run `go test ./...`. Note that this requires WireGuard to be running on the machine, and root privileges.
 
 ### Testing iptables using network namespaces
 To test iptables without messing with your system configuration, you can use network namespaces.
-To set one up and enter it, run the following commands:
+To set one up, enter it and allow localhost routing, run the following commands:
 
 ```
 sudo ip netns add wg-test
 sudo -E env "PATH=$PATH" nsenter --net=/var/run/netns/wg-test
+ip link set up lo
 ```
 
 Then you can run the tests as described above.

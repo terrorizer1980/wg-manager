@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/infosum/statsd"
@@ -18,8 +19,14 @@ import (
 // Requires a wireguard interface named wg0 to be running on the system
 
 const testInterface = "wg0"
+const testClientInterface = "wg1"
 
-var ipv4Net = net.ParseIP("10.99.0.0")
+var listenPort int = 4200
+var keepAliveInterval = time.Second
+
+var _, ipv4Net, _ = net.ParseCIDR("10.99.0.1/32")
+var _, ipv4ClientNet, _ = net.ParseCIDR("10.99.0.2/32")
+var ipv4IP = net.ParseIP("10.99.0.1")
 var ipv6Net = net.ParseIP("fc00:bbbb:bbbb:bb01::")
 
 var apiFixture = api.WireguardPeerList{
@@ -35,7 +42,7 @@ var peerFixture = []wgtypes.Peer{{
 	PublicKey: wgKey(),
 	AllowedIPs: []net.IPNet{
 		net.IPNet{
-			IP:   net.ParseIP("10.99.0.1"),
+			IP:   ipv4IP,
 			Mask: net.CIDRMask(32, 32),
 		},
 		net.IPNet{
@@ -69,13 +76,79 @@ func TestWireguard(t *testing.T) {
 	defer client.Close()
 	defer resetDevice(t, client)
 
+	wgPrivkey, _ := wgtypes.GeneratePrivateKey()
+	wgClientPrivkey, _ := wgtypes.GeneratePrivateKey()
+	wgExtrakey, _ := wgtypes.GenerateKey()
+
+	err = client.ConfigureDevice(testInterface, wgtypes.Config{
+		PrivateKey:   &wgPrivkey,
+		ListenPort:   &listenPort,
+		ReplacePeers: true,
+		Peers: []wgtypes.PeerConfig{
+			// Peer that will get a handshake
+			wgtypes.PeerConfig{
+				PublicKey:         wgClientPrivkey.PublicKey(),
+				ReplaceAllowedIPs: true,
+				AllowedIPs: []net.IPNet{
+					*ipv4ClientNet,
+				},
+			},
+			// Peer that will not get a handshake
+			wgtypes.PeerConfig{
+				PublicKey: wgExtrakey,
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = client.ConfigureDevice(testClientInterface, wgtypes.Config{
+		PrivateKey:   &wgClientPrivkey,
+		ReplacePeers: true,
+		Peers: []wgtypes.PeerConfig{
+			// Peer that will connect to the wireguard test interface
+			wgtypes.PeerConfig{
+				PublicKey:         wgPrivkey.PublicKey(),
+				ReplaceAllowedIPs: true,
+				AllowedIPs: []net.IPNet{
+					*ipv4Net,
+				},
+				Endpoint: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"),
+					Port: listenPort},
+				PersistentKeepaliveInterval: &keepAliveInterval,
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep so that there's time for a handshake between the peers
+	time.Sleep(time.Second * 2)
+
 	wg, err := wireguard.New([]string{testInterface}, metrics)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer wg.Close()
 
+	t.Run("check connected keys", func(t *testing.T) {
+		connectedKeys := wg.UpdatePeers(apiFixture)
+
+		expectedKeys := api.ConnectedKeysMap{
+			wgClientPrivkey.PublicKey().String(): 1,
+		}
+
+		if diff := cmp.Diff(expectedKeys, connectedKeys); diff != "" {
+			t.Fatalf("unexpected keys (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("add peers", func(t *testing.T) {
+
 		wg.UpdatePeers(apiFixture)
 
 		device, err := client.Device(testInterface)

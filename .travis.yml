@@ -13,7 +13,12 @@ script:
   - sudo apt-get -y update
   - sudo apt-get -y install linux-headers-$(uname -r) wireguard-dkms ipset
   - sudo ip link add wg0 type wireguard
+  - sudo ip link add wg1 type wireguard
   - sudo ip link set up wg0
+  - sudo ip link set up wg1
+  # Set up peer addresses for the interfaces
+  - sudo ip address add dev wg0 10.99.0.1 peer 10.99.0.2
+  - sudo ip address add dev wg1 10.99.0.2 peer 10.99.0.1
   # Build the project and run the tests
   - make
   # Set up iptables

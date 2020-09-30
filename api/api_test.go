@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"reflect"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/mullvad/wg-manager/api"
 )
 
-var fixture = api.WireguardPeerList{
+var peerFixture = api.WireguardPeerList{
 	api.WireguardPeer{
 		IPv4:   "10.99.0.1/32",
 		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
@@ -21,9 +22,18 @@ var fixture = api.WireguardPeerList{
 	},
 }
 
-func TestAPI(t *testing.T) {
+var connectedKeysFixture = api.ConnectedKeysMap{
+	strings.Repeat("a", 32): 1,
+	strings.Repeat("b", 32): 2,
+}
+
+var connectionsFixture = map[string]api.ConnectedKeysMap{
+	"connections": connectedKeysFixture,
+}
+
+func TestGetWireguardPeers(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		bytes, _ := json.Marshal(fixture)
+		bytes, _ := json.Marshal(peerFixture)
 		rw.Write(bytes)
 	}))
 	// Close the server when test finishes
@@ -35,6 +45,7 @@ func TestAPI(t *testing.T) {
 		Client:   server.Client(),
 		Username: "foo",
 		Password: "bar",
+		Hostname: "test",
 	}
 
 	peers, err := api.GetWireguardPeers()
@@ -42,7 +53,51 @@ func TestAPI(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if !reflect.DeepEqual(peers, fixture) {
-		t.Errorf("got unexpected result, wanted %+v, got %+v", peers, fixture)
+	if !reflect.DeepEqual(peers, peerFixture) {
+		t.Errorf("got unexpected result, wanted %+v, got %+v", peers, peerFixture)
+	}
+}
+
+func TestPostWireguardPeers(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		body, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		var connectedKeys map[string]api.ConnectedKeysMap
+		err = json.Unmarshal(body, &connectedKeys)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		if !reflect.DeepEqual(connectedKeys, connectionsFixture) {
+			t.Errorf("got unexpected result, wanted %+v, got %+v", connectedKeys, connectionsFixture)
+		}
+
+		rw.WriteHeader(http.StatusOK)
+	}))
+	// Close the server when test finishes
+	defer server.Close()
+
+	// Use Client & URL from our local test server
+	a := api.API{
+		BaseURL:  server.URL,
+		Client:   server.Client(),
+		Username: "foo",
+		Password: "bar",
+		Hostname: "test",
+	}
+
+	// Create a copy so that we don't alter the fixture
+	connectedKeysCopy := make(api.ConnectedKeysMap)
+
+	for k, v := range connectedKeysFixture {
+		connectedKeysCopy[k] = v
+	}
+
+	err := a.PostWireguardConnections(connectedKeysCopy)
+	if err != nil {
+		t.Fatalf(err.Error())
 	}
 }
