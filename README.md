@@ -1,6 +1,17 @@
 # wg-manager
 
-Daemon for configuring peers for WireGuard interfaces, and collect metrics from WireGuard
+## Introduction
+
+This tool is used on our server side infrastructure to manage Wireguard interfaces for our customers. This is not designed to be used by customers.
+
+wg-manager runs as a service on our infrastructure to enable users to connect and use our Wireguard servers.
+
+This services performs a number of tasks such as:
+
+- Keeping track and syncing the public key and peer data from our API
+- Removing and re-adding peers that were connected and subsequently disconnected, zeroing out information about when a peer was last connected.
+- Managing IPTable (firewall) rules for portforwarding
+- Gathering metrics about our Wireguard servers
 
 This project is not affiliated with the WireGuard project.
 WireGuard is a registered trademark of Jason A. Donenfeld.
