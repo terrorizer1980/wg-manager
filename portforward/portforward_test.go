@@ -31,6 +31,14 @@ var rulesFixture = []string{
 	"-A PORTFORWARDING_UDP -p udp -m set --match-set PORTFORWARDING_IPV6 dst -m multiport --dports 1234,4321 -j DNAT --to-destination fc00:bbbb:bbbb:bb01::1",
 }
 
+var rulesUpdatedPortsFixture = []int{1234, 4322, 1337}
+var rulesUpdatedFixture = []string{
+	"-A PORTFORWARDING_TCP -p tcp -m set --match-set PORTFORWARDING_IPV4 dst -m multiport --dports 1234,1337,4322 -j DNAT --to-destination 10.99.0.1",
+	"-A PORTFORWARDING_UDP -p udp -m set --match-set PORTFORWARDING_IPV4 dst -m multiport --dports 1234,1337,4322 -j DNAT --to-destination 10.99.0.1",
+	"-A PORTFORWARDING_TCP -p tcp -m set --match-set PORTFORWARDING_IPV6 dst -m multiport --dports 1234,1337,4322 -j DNAT --to-destination fc00:bbbb:bbbb:bb01::1",
+	"-A PORTFORWARDING_UDP -p udp -m set --match-set PORTFORWARDING_IPV6 dst -m multiport --dports 1234,1337,4322 -j DNAT --to-destination fc00:bbbb:bbbb:bb01::1",
+}
+
 var chains = []string{
 	"PORTFORWARDING_TCP",
 	"PORTFORWARDING_UDP",
@@ -90,6 +98,23 @@ func TestPortforward(t *testing.T) {
 			t.Fatalf("unexpected rules (-want +got):\n%s", diff)
 		}
 	})
+
+	t.Run("update rules for single peer", func(t *testing.T) {
+		// Make sure there are no old port forwardings left
+		pf.RemovePortforwarding(apiFixture[0])
+		pf.AddPortforwarding(apiFixture[0])
+
+		updatedFixture := apiFixture[0]
+		updatedFixture.Ports = rulesUpdatedPortsFixture
+
+		pf.UpdateSinglePeerPortforwarding(updatedFixture)
+
+		rules := getRules(t, ipts)
+		if diff := cmp.Diff(rulesUpdatedFixture, rules); diff != "" {
+			t.Fatalf("unexpected rules (-want +got):\n%s", diff)
+		}
+	})
+
 }
 
 func stringCompare(i string, j string) bool {
