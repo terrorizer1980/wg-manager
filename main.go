@@ -157,6 +157,8 @@ func handleEvent(event subscriber.WireguardEvent) {
 	case "REMOVE":
 		wg.RemovePeer(event.Peer)
 		pf.RemovePortforwarding(event.Peer)
+	case "UPDATEPORTFORWARD":
+		pf.UpdateSinglePeerPortforwarding(event.Peer)
 	default: // Bad data from the API, ignore it
 	}
 }
