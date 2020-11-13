@@ -144,12 +144,8 @@ func (p *Portforward) UpdatePortforwarding(peers api.WireguardPeerList) {
 		// Add new portforwarding rules
 		for rule, protocol := range rules {
 			if _, ok := currentRules[rule]; !ok {
-				ipt := p.iptables
-				if protocol == iptables.ProtocolIPv6 {
-					ipt = p.ip6tables
-				}
 
-				err := ipt.Append(table, chain.name, strings.Split(rule, " ")...)
+				p.insertPeerRule(protocol, table, chain.name, rule)
 				if err != nil {
 					log.Printf("error adding iptables rule")
 					continue
@@ -177,6 +173,36 @@ func (p *Portforward) UpdatePortforwarding(peers api.WireguardPeerList) {
 	}
 }
 
+// UpdateSinglePeerPortforwarding tries to add portforwarding rules for a peer while also trying to remove old rules for said peer
+func (p *Portforward) UpdateSinglePeerPortforwarding(peer api.WireguardPeer) {
+	if len(peer.Ports) < 1 {
+		return
+	}
+
+	for _, chain := range p.chains {
+		rules := make(map[string]iptables.Protocol)
+		p.createPeerRules(peer, chain.transportProtocol, rules)
+
+		oldRules, err := p.getCurrentRules(chain.name)
+		if err != nil {
+			log.Printf("error getting current iptables rules %s", err.Error())
+			return
+		}
+
+		for rule, protocol := range rules {
+			// Add new portforwarding rules
+			p.insertPeerRule(protocol, table, chain.name, rule)
+			if err != nil {
+				log.Printf("error adding iptables rule")
+				continue
+			}
+			// Remove old portforwarding rules
+			p.removeOldPeerRules(peer, protocol, table, chain.name, oldRules, rule)
+		}
+
+	}
+}
+
 // AddPortforwarding tries to add portforwarding rules for a peer without checking existing ones
 func (p *Portforward) AddPortforwarding(peer api.WireguardPeer) {
 	if len(peer.Ports) < 1 {
@@ -187,17 +213,10 @@ func (p *Portforward) AddPortforwarding(peer api.WireguardPeer) {
 		rules := make(map[string]iptables.Protocol)
 		p.createPeerRules(peer, chain.transportProtocol, rules)
 
-		// Add new portforwarding rules
 		for rule, protocol := range rules {
-			ipt := p.iptables
-			if protocol == iptables.ProtocolIPv6 {
-				ipt = p.ip6tables
-			}
-
-			err := ipt.Append(table, chain.name, strings.Split(rule, " ")...)
+			err := p.insertPeerRule(protocol, table, chain.name, rule)
 			if err != nil {
 				log.Printf("error adding iptables rule")
-				continue
 			}
 		}
 	}
@@ -223,6 +242,40 @@ func (p *Portforward) RemovePortforwarding(peer api.WireguardPeer) {
 			}
 
 			err := ipt.Delete(table, chain.name, strings.Split(rule, " ")...)
+			if err != nil {
+				log.Printf("error deleting iptables rule")
+				continue
+			}
+		}
+	}
+}
+
+func (p *Portforward) insertPeerRule(protocol iptables.Protocol, table string, chain string, rule string) error {
+	ipt := p.iptables
+	if protocol == iptables.ProtocolIPv6 {
+		ipt = p.ip6tables
+	}
+
+	err := ipt.Insert(table, chain, 1, strings.Split(rule, " ")...)
+	return err
+}
+
+func (p *Portforward) removeOldPeerRules(peer api.WireguardPeer, protocol iptables.Protocol, table string, chain string,
+	oldRules map[string]iptables.Protocol, rule string) {
+	ipt := p.iptables
+	if protocol == iptables.ProtocolIPv6 {
+		ipt = p.ip6tables
+	}
+
+	for oldRule := range oldRules {
+		sameRule := oldRule == rule
+		addressIPv4, _, _ := net.ParseCIDR(peer.IPv4)
+		addressIPv6, _, _ := net.ParseCIDR(peer.IPv6)
+		sameDestinationIPV4 := strings.Contains(oldRule, addressIPv4.String())
+		sameDestinationIPV6 := strings.Contains(oldRule, addressIPv6.String())
+
+		if !sameRule && (sameDestinationIPV4 || sameDestinationIPV6) {
+			err := ipt.Delete(table, chain, strings.Split(oldRule, " ")...)
 			if err != nil {
 				log.Printf("error deleting iptables rule")
 				continue
