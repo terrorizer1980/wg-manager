@@ -87,7 +87,7 @@ func newIPTables(chains []Chain, protocol iptables.Protocol) (*iptables.IPTables
 	}
 
 	for _, chain := range chains {
-		if !chainExists(chain.name, currentChains, ipt) {
+		if !chainExists(chain.name, currentChains) {
 			return nil, fmt.Errorf("an iptables chain named %s does not exist", chain)
 		}
 	}
@@ -95,7 +95,7 @@ func newIPTables(chains []Chain, protocol iptables.Protocol) (*iptables.IPTables
 	return ipt, nil
 }
 
-func chainExists(chain string, currentChains []string, ipt *iptables.IPTables) bool {
+func chainExists(chain string, currentChains []string) bool {
 
 	for _, currentChain := range currentChains {
 		if currentChain == chain {
