@@ -271,10 +271,10 @@ func (p *Portforward) removeOldPeerRules(peer api.WireguardPeer, protocol iptabl
 		sameRule := oldRule == rule
 		addressIPv4, _, _ := net.ParseCIDR(peer.IPv4)
 		addressIPv6, _, _ := net.ParseCIDR(peer.IPv6)
-		sameDestinationIPV4 := strings.Contains(oldRule, addressIPv4.String())
-		sameDestinationIPV6 := strings.Contains(oldRule, addressIPv6.String())
+		oldRuleSlice := strings.Split(oldRule, " ")
+		oldIP := net.ParseIP(oldRuleSlice[len(oldRuleSlice)-1])
 
-		if !sameRule && (sameDestinationIPV4 || sameDestinationIPV6) {
+		if !sameRule && (oldIP.Equal(addressIPv4) || oldIP.Equal(addressIPv6)) {
 			err := ipt.Delete(table, chain, strings.Split(oldRule, " ")...)
 			if err != nil {
 				log.Printf("error deleting iptables rule")
