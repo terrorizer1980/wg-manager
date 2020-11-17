@@ -235,7 +235,7 @@ func (w *Wireguard) AddPeer(peer api.WireguardPeer) {
 		// Add the peer
 		err := w.client.ConfigureDevice(d, wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
-				wgtypes.PeerConfig{
+				{
 					PublicKey:         key,
 					ReplaceAllowedIPs: true,
 					AllowedIPs: []net.IPNet{
@@ -264,7 +264,7 @@ func (w *Wireguard) RemovePeer(peer api.WireguardPeer) {
 		// Remove the peer
 		err := w.client.ConfigureDevice(d, wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
-				wgtypes.PeerConfig{
+				{
 					PublicKey: key,
 					Remove:    true,
 				},
