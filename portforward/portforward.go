@@ -262,23 +262,28 @@ func (p *Portforward) insertPeerRule(protocol iptables.Protocol, table string, c
 
 func (p *Portforward) removeOldPeerRules(peer api.WireguardPeer, protocol iptables.Protocol, table string, chain string,
 	oldRules map[string]iptables.Protocol, rule string) {
-	ipt := p.iptables
+	var ipt *iptables.IPTables
+	var peerIP net.IP
+
 	if protocol == iptables.ProtocolIPv6 {
 		ipt = p.ip6tables
+		peerIP, _, _ = net.ParseCIDR(peer.IPv6)
+	} else {
+		ipt = p.iptables
+		peerIP, _, _ = net.ParseCIDR(peer.IPv4)
 	}
 
 	for oldRule := range oldRules {
-		sameRule := oldRule == rule
-		addressIPv4, _, _ := net.ParseCIDR(peer.IPv4)
-		addressIPv6, _, _ := net.ParseCIDR(peer.IPv6)
-		oldRuleSlice := strings.Split(oldRule, " ")
-		oldIP := net.ParseIP(oldRuleSlice[len(oldRuleSlice)-1])
+		if oldRule != rule {
+			oldRuleSlice := strings.Split(oldRule, " ")
+			oldIP := net.ParseIP(oldRuleSlice[len(oldRuleSlice)-1])
 
-		if !sameRule && (oldIP.Equal(addressIPv4) || oldIP.Equal(addressIPv6)) {
-			err := ipt.Delete(table, chain, strings.Split(oldRule, " ")...)
-			if err != nil {
-				log.Printf("error deleting iptables rule")
-				continue
+			if oldIP.Equal(peerIP) {
+				err := ipt.Delete(table, chain, strings.Split(oldRule, " ")...)
+				if err != nil {
+					log.Printf("error deleting iptables rule")
+					continue
+				}
 			}
 		}
 	}
