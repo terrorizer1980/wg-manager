@@ -150,15 +150,26 @@ func main() {
 }
 
 func handleEvent(event subscriber.WireguardEvent) {
+
 	switch event.Action {
 	case "ADD":
+		t := metrics.NewTiming()
 		wg.AddPeer(event.Peer)
+		t.Send("add_event_add_peer_time")
+		t = metrics.NewTiming()
 		pf.AddPortforwarding(event.Peer)
+		t.Send("add_event_add_portforwarding_time")
 	case "REMOVE":
+		t := metrics.NewTiming()
 		wg.RemovePeer(event.Peer)
+		t.Send("remove_event_remove_peer_time")
+		t = metrics.NewTiming()
 		pf.RemovePortforwarding(event.Peer)
+		t.Send("remove_event_remove_portforwarding_time")
 	case "UPDATE_PORTS":
+		t := metrics.NewTiming()
 		pf.UpdateSinglePeerPortforwarding(event.Peer)
+		t.Send("update_ports_event_update_portforwarding_time")
 	default: // Bad data from the API, ignore it
 	}
 }
