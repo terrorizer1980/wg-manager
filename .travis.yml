@@ -12,7 +12,6 @@ addons:
       - ipset
       - wireguard
 script:
-  - ci/setup_testing_environment.sh
   - make ci
 
 notifications:

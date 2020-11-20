@@ -1,6 +1,6 @@
 GO_PACKAGER_DOCKER_IMAGE="quay.io/mullvad/go-packager@sha256:7cd9d52c13f70b0b95e312609e3321bbc61e3e2f3478f5e30f7df194289a9ebb"
 
-.PHONY: ci clean fmt install integration-test package shell test vet
+.PHONY: ci clean fmt install integration-test package setup-testing-environment shell test vet
 all: test vet install
 
 fmt:
@@ -18,7 +18,11 @@ integration-test:
 docker-test: .make/docker_local_testing
 	docker run --rm -it --cap-add CAP_NET_ADMIN -v ${PWD}:/repo wg-manager-testing bash -c "./setup_testing_environment.sh; gotestsum; gotestsum --watch"
 
-ci: integration-test vet
+ci: vet test
+	sudo ./setup_testing_environment.sh
+	go test -c ./portforward && go test -c ./wireguard
+	sudo ./portforward.test -test.v
+	sudo ./wireguard.test -test.v
 
 install:
 	go install ./...
