@@ -22,9 +22,13 @@ Clone this repository, and run `make` to build.
 This will produce a `wg-manager` binary and put them in your `GOBIN`.
 
 ## Testing
-To run the tests, run `make test`.
 
-To run the integration tests as well, look at the `.travis`-file in the repository to see the prerequisite steps to be able to run them. After which you can run `go test ./...`. Note that this requires WireGuard to be running on the machine, and root privileges.
+There are three ways to run tests:
+
+1. To run tests which do not depend on wireguard or iptables, run `make test`.
+1. To run integrations tests which requires wireguard and iptables, run `make integration-test`.
+1. To run continuous testing in docker, run `make docker-test`.
+   This requires wireguard to be setup on the host machine
 
 ### Testing iptables using network namespaces
 To test iptables without messing with your system configuration, you can use network namespaces.
@@ -34,9 +38,15 @@ To set one up, enter it and allow localhost routing, run the following commands:
 sudo ip netns add wg-test
 sudo -E env "PATH=$PATH" nsenter --net=/var/run/netns/wg-test
 ip link set up lo
+./setup_testing_environment.sh
 ```
 
 Then you can run the tests as described above.
+
+### Testing iptables using docker
+Run `make shell` to get a docker shell which has an isolated network.
+It will drop you in the `/repo` folder which is mounted to the source.
+You can then run `make integration-test` or any other make or go commands.
 
 ## Usage
 All options can be either configured via command line flags, or via their respective environment variable, as denoted by `[ENVIRONMENT_VARIABLE]`.
