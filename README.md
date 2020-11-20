@@ -65,3 +65,6 @@ git tag -s -a v1.0.0 -m "1.0.0"
 ```
 Then, run `make package`. This will output the new package in the `build` folder.
 Don't forget to push the tag to git afterwards.
+
+`make package` creates files as root.
+So to cleanup using `make clean` you might have to run `sudo make clean`
