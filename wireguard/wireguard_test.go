@@ -41,11 +41,11 @@ var apiFixture = api.WireguardPeerList{
 var peerFixture = []wgtypes.Peer{{
 	PublicKey: wgKey(),
 	AllowedIPs: []net.IPNet{
-		net.IPNet{
+		{
 			IP:   ipv4IP,
 			Mask: net.CIDRMask(32, 32),
 		},
-		net.IPNet{
+		{
 			IP:   net.ParseIP("fc00:bbbb:bbbb:bb01::1"),
 			Mask: net.CIDRMask(128, 128),
 		},
@@ -86,7 +86,7 @@ func TestWireguard(t *testing.T) {
 		ReplacePeers: true,
 		Peers: []wgtypes.PeerConfig{
 			// Peer that will get a handshake
-			wgtypes.PeerConfig{
+			{
 				PublicKey:         wgClientPrivkey.PublicKey(),
 				ReplaceAllowedIPs: true,
 				AllowedIPs: []net.IPNet{
@@ -94,7 +94,7 @@ func TestWireguard(t *testing.T) {
 				},
 			},
 			// Peer that will not get a handshake
-			wgtypes.PeerConfig{
+			{
 				PublicKey: wgExtrakey,
 			},
 		},
@@ -109,7 +109,7 @@ func TestWireguard(t *testing.T) {
 		ReplacePeers: true,
 		Peers: []wgtypes.PeerConfig{
 			// Peer that will connect to the wireguard test interface
-			wgtypes.PeerConfig{
+			{
 				PublicKey:         wgPrivkey.PublicKey(),
 				ReplaceAllowedIPs: true,
 				AllowedIPs: []net.IPNet{
