@@ -12,26 +12,7 @@ addons:
       - ipset
       - wireguard
 script:
-  - sudo ip link add wg0 type wireguard
-  - sudo ip link add wg1 type wireguard
-  - sudo ip link set up wg0
-  - sudo ip link set up wg1
-  # Set up peer addresses for the interfaces
-  - sudo ip address add dev wg0 10.99.0.1 peer 10.99.0.2
-  - sudo ip address add dev wg1 10.99.0.2 peer 10.99.0.1
-  # Build the project and run the tests
-  - make
-  # Set up iptables
-  - sudo iptables -t nat -N PORTFORWARDING_TCP
-  - sudo ip6tables -t nat -N PORTFORWARDING_TCP
-  - sudo iptables -t nat -N PORTFORWARDING_UDP
-  - sudo ip6tables -t nat -N PORTFORWARDING_UDP
-  - sudo ipset create PORTFORWARDING_IPV4 hash:ip
-  - sudo ipset create PORTFORWARDING_IPV6 hash:ip family inet6
-  # Build the integration tests
-  - go test -c ./portforward && go test -c ./wireguard
-  # Run integration tests
-  - sudo ./portforward.test -test.v && sudo ./wireguard.test -test.v
+  - make ci
 
 notifications:
   email:
