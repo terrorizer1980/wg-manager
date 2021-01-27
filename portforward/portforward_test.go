@@ -56,7 +56,7 @@ func TestPortforward(t *testing.T) {
 		t.Skip("skipping integration tests")
 	}
 
-	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6)
+	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "se-got-001.mullvad.net")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,14 +166,21 @@ func TestInvalidChain(t *testing.T) {
 		t.Skip("skipping integration tests")
 	}
 
-	_, err := portforward.New("nonexistant", ipsetIPv4, ipsetIPv6)
+	_, err := portforward.New("nonexistant", ipsetIPv4, ipsetIPv6, "se-got-001.mullvad.net")
 	if err == nil {
 		t.Fatal("no error")
 	}
 }
 
 func TestInvalidIPSet(t *testing.T) {
-	_, err := portforward.New(chainPrefix, "nonexistant", "nonexistant")
+	_, err := portforward.New(chainPrefix, "nonexistant", "nonexistant", "se-got-001.mullvad.net")
+	if err == nil {
+		t.Fatal("no error")
+	}
+}
+
+func TestNewErrorsOnUnparsableHostname(t *testing.T) {
+	_, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "apa.mullvad.net")
 	if err == nil {
 		t.Fatal("no error")
 	}

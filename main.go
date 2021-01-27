@@ -98,7 +98,12 @@ func main() {
 	defer wg.Close()
 
 	// Initialize portforward
-	pf, err = portforward.New(*portForwardingChainPrefix, *portForwardingIpsetIPv4, *portForwardingIpsetIPv6)
+	pf, err = portforward.New(
+		*portForwardingChainPrefix,
+		*portForwardingIpsetIPv4,
+		*portForwardingIpsetIPv6,
+		*hostname)
+
 	if err != nil {
 		log.Fatalf("error initializing portforwarding %s", err)
 	}

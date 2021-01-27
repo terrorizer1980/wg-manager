@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ type Portforward struct {
 	chains    []Chain
 	ipsetIPv4 string
 	ipsetIPv6 string
+	location  string
 }
 
 // Chain contains a chain name and a transport protocol
@@ -37,7 +39,7 @@ const table = "nat"
 var transportProtocols = []string{"tcp", "udp"}
 
 // New validates the addresses, ensures that the iptables portforwarding chains exists, and returns a new Portforward instance
-func New(chainPrefix string, ipsetTableIPv4 string, ipsetTableIPv6 string) (*Portforward, error) {
+func New(chainPrefix string, ipsetTableIPv4 string, ipsetTableIPv6 string, hostname string) (*Portforward, error) {
 	var chains []Chain
 	for _, transportProtocol := range transportProtocols {
 		chains = append(chains, Chain{
@@ -66,12 +68,18 @@ func New(chainPrefix string, ipsetTableIPv4 string, ipsetTableIPv6 string) (*Por
 		return nil, err
 	}
 
+	location, err := newLocation(hostname)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Portforward{
 		iptables:  ipt,
 		ip6tables: ip6t,
 		chains:    chains,
 		ipsetIPv4: ipsetTableIPv4,
 		ipsetIPv6: ipsetTableIPv6,
+		location:  location,
 	}, nil
 }
 
@@ -93,6 +101,15 @@ func newIPTables(chains []Chain, protocol iptables.Protocol) (*iptables.IPTables
 	}
 
 	return ipt, nil
+}
+
+func newLocation(hostname string) (string, error) {
+	validHostname := regexp.MustCompile(`^([a-z]+-[a-z]+)-[0-9]{3}.mullvad.net$`)
+	location := validHostname.FindStringSubmatch(hostname)
+	if location == nil {
+		return "", fmt.Errorf("Hostname %s is not of format <country>-<city>-<XXX>.mullvad.net", hostname)
+	}
+	return location[1], nil
 }
 
 func chainExists(chain string, currentChains []string) bool {
