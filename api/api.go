@@ -22,10 +22,11 @@ type WireguardPeerList []WireguardPeer
 
 // WireguardPeer is a wireguard peer
 type WireguardPeer struct {
-	IPv4   string `json:"ipv4"`
-	IPv6   string `json:"ipv6"`
-	Ports  []int  `json:"ports"`
-	Pubkey string `json:"pubkey"`
+	IPv4   string   `json:"ipv4"`
+	IPv6   string   `json:"ipv6"`
+	Ports  []int    `json:"ports"`
+	Cities []string `json:"cities,omitempty"`
+	Pubkey string   `json:"pubkey"`
 }
 
 // ConnectedKeysMap contains connected keys and their respective numer of keys
