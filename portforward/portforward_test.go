@@ -83,7 +83,7 @@ func TestPortforward(t *testing.T) {
 		t.Skip("skipping integration tests")
 	}
 
-	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "se-got-001.mullvad.net")
+	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "se-got")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestPortforwardWithCities(t *testing.T) {
 		t.Skip("skipping integration tests")
 	}
 
-	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "se-got-001.mullvad.net")
+	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "se-got")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,21 +226,21 @@ func TestInvalidChain(t *testing.T) {
 		t.Skip("skipping integration tests")
 	}
 
-	_, err := portforward.New("nonexistant", ipsetIPv4, ipsetIPv6, "se-got-001.mullvad.net")
+	_, err := portforward.New("nonexistant", ipsetIPv4, ipsetIPv6, "se-got")
 	if err == nil {
 		t.Fatal("no error")
 	}
 }
 
 func TestInvalidIPSet(t *testing.T) {
-	_, err := portforward.New(chainPrefix, "nonexistant", "nonexistant", "se-got-001.mullvad.net")
+	_, err := portforward.New(chainPrefix, "nonexistant", "nonexistant", "se-got")
 	if err == nil {
 		t.Fatal("no error")
 	}
 }
 
 func TestNewErrorsOnUnparsableHostname(t *testing.T) {
-	_, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "apa.mullvad.net")
+	_, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "apa")
 	if err == nil {
 		t.Fatal("no error")
 	}

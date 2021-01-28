@@ -39,6 +39,7 @@ func main() {
 	username := flag.String("username", "", "api username")
 	password := flag.String("password", "", "api password")
 	hostname := flag.String("hostname", "", "server hostname")
+	location := flag.String("location", "", "server location, e.g. se-mma")
 	interfaces := flag.String("interfaces", "wg0", "wireguard interfaces to configure. Pass a comma delimited list to configure multiple interfaces, eg 'wg0,wg1,wg2'")
 	portForwardingChainPrefix := flag.String("portforwarding-chain-prefix", "PORTFORWARDING", "iptables chain prefix to use for portforwarding")
 	portForwardingIpsetIPv4 := flag.String("portforwarding-ipset-ipv4", "PORTFORWARDING_IPV4", "ipset table to use for portforwarding for ipv4 addresses.")
@@ -102,7 +103,7 @@ func main() {
 		*portForwardingChainPrefix,
 		*portForwardingIpsetIPv4,
 		*portForwardingIpsetIPv6,
-		*hostname)
+		*location)
 
 	if err != nil {
 		log.Fatalf("error initializing portforwarding %s", err)
