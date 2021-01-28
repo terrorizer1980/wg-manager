@@ -41,6 +41,16 @@ var connectionsFixture = map[string]api.ConnectedKeysMap{
 	"connections": connectedKeysFixture,
 }
 
+// More a sanity check than anything else to know what a null element in the json struct unmarshals to.
+func TestWireGuardPeerWithNullElements(t *testing.T) {
+	json_data := `[{"ipv4":"10.99.0.1/32","ipv6":"fc00:bbbb:bbbb:bb01::1/128","ports":[1234,4321],"cities":[null,"se-got"],"pubkey":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]`
+	var decodedResponse api.WireguardPeerList
+	json.Unmarshal([]byte(json_data), &decodedResponse)
+	if decodedResponse[0].Cities[0] != "" {
+		t.Fatalf("null json element not converted to empty string")
+	}
+}
+
 func TestGetWireguardPeers(t *testing.T) {
 	call_count := 0
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -83,6 +93,10 @@ func TestGetWireguardPeers(t *testing.T) {
 	peers, err = api.GetWireguardPeers()
 	if err != nil {
 		t.Fatalf(err.Error())
+	}
+
+	if len(peers[0].Cities) != 0 {
+		t.Errorf("Cities list not empty")
 	}
 
 	if !reflect.DeepEqual(peers, peerWithoutCitiesFixtures) {
