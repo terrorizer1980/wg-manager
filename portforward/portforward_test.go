@@ -24,7 +24,34 @@ var apiFixture = api.WireguardPeerList{
 	},
 }
 
+var apiFixtureCities = api.WireguardPeerList{
+	api.WireguardPeer{
+		IPv4:   "10.99.0.1/32",
+		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
+		Ports:  []int{4321, 1234, 5678},
+		Cities: []string{"", "se-got", "se-mma"},
+		Pubkey: base64.StdEncoding.EncodeToString([]byte(strings.Repeat("a", 32))),
+	},
+}
+
+var apiFixtureBrokenCities = api.WireguardPeerList{
+	api.WireguardPeer{
+		IPv4:   "10.99.0.1/32",
+		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
+		Ports:  []int{4321, 1234},
+		Cities: []string{"", "se-got", "se-mma"},
+		Pubkey: base64.StdEncoding.EncodeToString([]byte(strings.Repeat("a", 32))),
+	},
+}
+
 var rulesFixture = []string{
+	"-A PORTFORWARDING_TCP -p tcp -m set --match-set PORTFORWARDING_IPV4 dst -m multiport --dports 1234,4321 -j DNAT --to-destination 10.99.0.1",
+	"-A PORTFORWARDING_UDP -p udp -m set --match-set PORTFORWARDING_IPV4 dst -m multiport --dports 1234,4321 -j DNAT --to-destination 10.99.0.1",
+	"-A PORTFORWARDING_TCP -p tcp -m set --match-set PORTFORWARDING_IPV6 dst -m multiport --dports 1234,4321 -j DNAT --to-destination fc00:bbbb:bbbb:bb01::1",
+	"-A PORTFORWARDING_UDP -p udp -m set --match-set PORTFORWARDING_IPV6 dst -m multiport --dports 1234,4321 -j DNAT --to-destination fc00:bbbb:bbbb:bb01::1",
+}
+
+var rulesFixtureCities = []string{
 	"-A PORTFORWARDING_TCP -p tcp -m set --match-set PORTFORWARDING_IPV4 dst -m multiport --dports 1234,4321 -j DNAT --to-destination 10.99.0.1",
 	"-A PORTFORWARDING_UDP -p udp -m set --match-set PORTFORWARDING_IPV4 dst -m multiport --dports 1234,4321 -j DNAT --to-destination 10.99.0.1",
 	"-A PORTFORWARDING_TCP -p tcp -m set --match-set PORTFORWARDING_IPV6 dst -m multiport --dports 1234,4321 -j DNAT --to-destination fc00:bbbb:bbbb:bb01::1",
@@ -115,6 +142,39 @@ func TestPortforward(t *testing.T) {
 		}
 	})
 
+}
+
+func TestPortforwardWithCities(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration tests")
+	}
+
+	pf, err := portforward.New(chainPrefix, ipsetIPv4, ipsetIPv6, "se-got-001.mullvad.net")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ipts := setupIptables(t)
+
+	t.Run("add rules", func(t *testing.T) {
+		pf.UpdatePortforwarding(apiFixtureCities)
+
+		rules := getRules(t, ipts)
+		if diff := cmp.Diff(rulesFixtureCities, rules, cmpopts.SortSlices(stringCompare)); diff != "" {
+			t.Fatalf("unexpected rules (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("mismatch cities/ports", func(t *testing.T) {
+		pf.UpdatePortforwarding(apiFixtureBrokenCities)
+
+		rules := getRules(t, ipts)
+		expected_rules := []string{}
+		if diff := cmp.Diff(expected_rules, rules, cmpopts.SortSlices(stringCompare)); diff != "" {
+			t.Fatalf("No rules should be present.")
+		}
+
+	})
 }
 
 func stringCompare(i string, j string) bool {
