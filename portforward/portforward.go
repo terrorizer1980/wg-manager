@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ type Portforward struct {
 	chains    []Chain
 	ipsetIPv4 string
 	ipsetIPv6 string
+	location  string
 }
 
 // Chain contains a chain name and a transport protocol
@@ -37,7 +39,7 @@ const table = "nat"
 var transportProtocols = []string{"tcp", "udp"}
 
 // New validates the addresses, ensures that the iptables portforwarding chains exists, and returns a new Portforward instance
-func New(chainPrefix string, ipsetTableIPv4 string, ipsetTableIPv6 string) (*Portforward, error) {
+func New(chainPrefix string, ipsetTableIPv4 string, ipsetTableIPv6 string, location string) (*Portforward, error) {
 	var chains []Chain
 	for _, transportProtocol := range transportProtocols {
 		chains = append(chains, Chain{
@@ -66,12 +68,18 @@ func New(chainPrefix string, ipsetTableIPv4 string, ipsetTableIPv6 string) (*Por
 		return nil, err
 	}
 
+	err = validateLocation(location)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Portforward{
 		iptables:  ipt,
 		ip6tables: ip6t,
 		chains:    chains,
 		ipsetIPv4: ipsetTableIPv4,
 		ipsetIPv6: ipsetTableIPv6,
+		location:  location,
 	}, nil
 }
 
@@ -93,6 +101,14 @@ func newIPTables(chains []Chain, protocol iptables.Protocol) (*iptables.IPTables
 	}
 
 	return ipt, nil
+}
+
+func validateLocation(location string) error {
+	validHostname := regexp.MustCompile(`^[a-z]+-[a-z]+$`)
+	if ! validHostname.MatchString(location) {
+		return fmt.Errorf("Location %s is not of format <country>-<city>", location)
+	}
+	return nil
 }
 
 func chainExists(chain string, currentChains []string) bool {
@@ -290,13 +306,19 @@ func (p *Portforward) removeOldPeerRules(peer api.WireguardPeer, protocol iptabl
 }
 
 func (p *Portforward) createPeerRules(peer api.WireguardPeer, transportProtocol string, rules map[string]iptables.Protocol) {
+	ports := peer.Ports
+	// filter ports if cities are present.
+	if len(peer.Cities) > 0 {
+		ports = filterPortsByCity(peer, p.location)
+	}
+
 	// Ignore ip's with errors, in-case we get bad data from the API
 	ipv4, _, err := net.ParseCIDR(peer.IPv4)
 	if err != nil {
 		return
 	}
 
-	rule := fmt.Sprintf("-p %s -m set --match-set %s dst -m multiport --dports %s -j DNAT --to-destination %s", transportProtocol, p.ipsetIPv4, getPortsString(peer.Ports), ipv4)
+	rule := fmt.Sprintf("-p %s -m set --match-set %s dst -m multiport --dports %s -j DNAT --to-destination %s", transportProtocol, p.ipsetIPv4, getPortsString(ports), ipv4)
 	rules[rule] = iptables.ProtocolIPv4
 
 	ipv6, _, err := net.ParseCIDR(peer.IPv6)
@@ -304,7 +326,7 @@ func (p *Portforward) createPeerRules(peer api.WireguardPeer, transportProtocol 
 		return
 	}
 
-	rule = fmt.Sprintf("-p %s -m set --match-set %s dst -m multiport --dports %s -j DNAT --to-destination %s", transportProtocol, p.ipsetIPv6, getPortsString(peer.Ports), ipv6)
+	rule = fmt.Sprintf("-p %s -m set --match-set %s dst -m multiport --dports %s -j DNAT --to-destination %s", transportProtocol, p.ipsetIPv6, getPortsString(ports), ipv6)
 	rules[rule] = iptables.ProtocolIPv6
 }
 
@@ -317,6 +339,27 @@ func getPortsString(ports []int) string {
 	}
 
 	return strings.Join(slice, ",")
+}
+
+// filterPortsByCity checks ports against the Cities list and only returns ports that are global
+// or match our location.
+func filterPortsByCity(peer api.WireguardPeer, location string) []int {
+	// if ports/cities don't have the same length, return empty array
+	if len(peer.Ports) != len(peer.Cities) {
+		log.Printf("warning: peer ports and cities have different lenghts. Skipping port forwarding.")
+		return []int{}
+	}
+
+	ports := make([]int, 0, len(peer.Ports))
+	for i, port := range peer.Ports {
+		city := peer.Cities[i]
+
+		// A global port is defined as "null" in the json which turns into an empty string in the struct.
+		if city == "" || city == location {
+			ports = append(ports, port)
+		}
+	}
+	return ports
 }
 
 func (p *Portforward) getCurrentRules(chain string) (map[string]iptables.Protocol, error) {

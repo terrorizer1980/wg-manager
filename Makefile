@@ -22,7 +22,7 @@ integration-test:
 	go test -v ./...
 
 docker-test: .make/docker_local_testing
-	docker run --rm -it --cap-add CAP_NET_ADMIN -v ${PWD}:/repo ${DOCKER_TEST_IMAGE} bash -c "./setup_testing_environment.sh; gotestsum; gotestsum --watch"
+	docker run --rm -it --cap-add CAP_NET_ADMIN,CAP_NET_RAW -v ${PWD}:/repo ${DOCKER_TEST_IMAGE} bash -c "./setup_testing_environment.sh; gotestsum --format standard-verbose; gotestsum --format standard-verbose --watch"
 
 ci: vet test
 	sudo ./setup_testing_environment.sh
