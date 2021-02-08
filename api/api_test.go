@@ -72,11 +72,12 @@ func TestGetWireguardPeers(t *testing.T) {
 
 	// Use Client & URL from our local test server
 	api := api.API{
-		BaseURL:  server.URL,
-		Client:   server.Client(),
-		Username: "foo",
-		Password: "bar",
-		Hostname: "test",
+		BaseURL:       server.URL,
+		Client:        server.Client(),
+		Username:      "foo",
+		Password:      "bar",
+		Hostname:      "test",
+		PeerCachePath: "/tmp/wg-manager-peer-list.json",
 	}
 
 	// First get peers from the api with cities present.

@@ -49,6 +49,7 @@ func main() {
 	mqUsername := flag.String("mq-username", "", "message-queue username")
 	mqPassword := flag.String("mq-password", "", "message-queue password")
 	mqChannel := flag.String("mq-channel", "wireguard", "message-queue channel")
+	peerCachePath := flag.String("peer-cache-path", "/tmp/wg-manager-peer-cache.json", "path to file to use as a peer cache")
 
 	// Parse environment variables
 	envy.Parse("WG")
@@ -83,6 +84,7 @@ func main() {
 		Client: &http.Client{
 			Timeout: *apiTimeout,
 		},
+		PeerCachePath: *peerCachePath,
 	}
 
 	// Initialize Wireguard

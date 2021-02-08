@@ -4,17 +4,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 // API is a utility for communicating with the Mullvad API
 type API struct {
-	Username string
-	Password string
-	BaseURL  string
-	Hostname string
-	Client   *http.Client
+	Username      string
+	Password      string
+	BaseURL       string
+	Hostname      string
+	Client        *http.Client
+	PeerCachePath string
 }
 
 // WireguardPeerList is a list of Wireguard peers
@@ -29,14 +32,13 @@ type WireguardPeer struct {
 	Pubkey string   `json:"pubkey"`
 }
 
-// ConnectedKeysMap contains connected keys and their respective numer of keys
+// ConnectedKeysMap contains connected keys and their respective number of keys
 type ConnectedKeysMap map[string]int
 
-// GetWireguardPeers fetches a list of wireguard peers from the API and returns it
-func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
+func (a *API) updateWireguardPeerCache() error {
 	req, err := http.NewRequest("GET", a.BaseURL+"/internal/active-wireguard-peers/", nil)
 	if err != nil {
-		return WireguardPeerList{}, err
+		return err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
@@ -48,18 +50,41 @@ func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
 
 	response, err := a.Client.Do(req)
 	if err != nil {
-		return WireguardPeerList{}, err
+		return err
 	}
-
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	cache, err := os.Create(a.PeerCachePath)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(cache, response.Body)
+
+	return err
+}
+
+func (a *API) clearWireguardPeerCache() {
+	os.Remove(a.PeerCachePath)
+}
+
+// GetWireguardPeers fetches a list of wireguard peers from the API and returns it
+func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
+
+	// Update the cache.
+	err := a.updateWireguardPeerCache()
+	if err != nil {
+		return WireguardPeerList{}, err
+	}
+	defer a.clearWireguardPeerCache()
+
+	content, err := ioutil.ReadFile(a.PeerCachePath)
 	if err != nil {
 		return WireguardPeerList{}, err
 	}
 
 	var decodedResponse WireguardPeerList
-	err = json.Unmarshal(body, &decodedResponse)
+	err = json.Unmarshal(content, &decodedResponse)
 	if err != nil {
 		return WireguardPeerList{}, fmt.Errorf("error decoding wireguard peers")
 	}
