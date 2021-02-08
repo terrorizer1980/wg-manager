@@ -4,7 +4,7 @@ FROM ${base_image}
 RUN echo "deb http://deb.debian.org/debian buster-backports main" >> /etc/apt/sources.list
 
 RUN apt-get update && \
-    apt-get install -y iptables ipset && \
+    apt-get install -y iptables ipset graphviz && \
     apt-get -t buster-backports install -y wireguard
 
 RUN go get gotest.tools/gotestsum

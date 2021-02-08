@@ -37,7 +37,7 @@ package:
 	docker run --rm -v ${PWD}:/repo -v ${PWD}/build:/build ${GO_PACKAGER_DOCKER_IMAGE}
 
 shell: .make/docker_local_testing
-	docker run --rm -it --cap-add CAP_NET_ADMIN -v ${PWD}:/repo ${DOCKER_TEST_IMAGE} bash
+	docker run --rm -it --cap-add CAP_NET_ADMIN,CAP_NET_RAW -p 8000:8000 -v ${PWD}:/repo ${DOCKER_TEST_IMAGE} bash
 
 clean:
 	rm -rf build .make wg-manager
