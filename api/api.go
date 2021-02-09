@@ -32,9 +32,33 @@ type WireguardPeer struct {
 	Pubkey string   `json:"pubkey"`
 }
 
+// WireguardPeerIterator can be used to more efficiently work with large numbers of wireguard peers.
+type WireguardPeerIterator struct {
+	Peers   WireguardPeerList
+	counter int
+}
+
 // ConnectedKeysMap contains connected keys and their respective number of keys
 type ConnectedKeysMap map[string]int
 
+// Next() will return the next element in the iterator if there are any more elements.
+func (wpi *WireguardPeerIterator) Next() *WireguardPeer {
+	if wpi.counter >= len(wpi.Peers) {
+		return nil
+	}
+
+	ret := wpi.Peers[wpi.counter]
+	wpi.counter++
+
+	return &ret
+}
+
+// ToList will convert the iterator (or what is left) into a WireguardPeerList
+func (wpi *WireguardPeerIterator) ToList() WireguardPeerList {
+	return wpi.Peers
+}
+
+// updateWireguardPeerCache fetches the list of peers from the api and stored it locally.
 func (a *API) updateWireguardPeerCache() error {
 	req, err := http.NewRequest("GET", a.BaseURL+"/internal/active-wireguard-peers/", nil)
 	if err != nil {
@@ -64,6 +88,7 @@ func (a *API) updateWireguardPeerCache() error {
 	return err
 }
 
+// clearWireguardPeerCache removes the cache.
 func (a *API) clearWireguardPeerCache() {
 	os.Remove(a.PeerCachePath)
 }
@@ -90,6 +115,31 @@ func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
 	}
 
 	return decodedResponse, nil
+}
+
+// GetWireguardPeersIterator returns a WireguardPeerIterator that can be used to get peers.
+func (a *API) GetWireguardPeersIterator() (WireguardPeerIterator, error) {
+
+	// Update the cache.
+	err := a.updateWireguardPeerCache()
+	if err != nil {
+		return WireguardPeerIterator{}, err
+	}
+	defer a.clearWireguardPeerCache()
+
+	content, err := ioutil.ReadFile(a.PeerCachePath)
+	if err != nil {
+		return WireguardPeerIterator{}, err
+	}
+
+	var decodedResponse WireguardPeerList
+	err = json.Unmarshal(content, &decodedResponse)
+	if err != nil {
+		return WireguardPeerIterator{}, fmt.Errorf("error decoding wireguard peers")
+	}
+
+	return WireguardPeerIterator{Peers: decodedResponse}, nil
+
 }
 
 // PostWireguardConnections posts the number of connected wireguard keys to the API

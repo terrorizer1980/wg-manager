@@ -106,6 +106,53 @@ func TestGetWireguardPeers(t *testing.T) {
 
 }
 
+func TestGetWireguardPeerIterator(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Return different responses depending on call number.
+		bytes, _ := json.Marshal(peerFixture)
+		rw.Write(bytes)
+	}))
+
+	// Close the server when test finishes
+	defer server.Close()
+
+	// Use Client & URL from our local test server
+	api := api.API{
+		BaseURL:       server.URL,
+		Client:        server.Client(),
+		Username:      "foo",
+		Password:      "bar",
+		Hostname:      "test",
+		PeerCachePath: "/tmp/wg-manager-peer-list.json",
+	}
+
+	// Get peer iterator
+	peers, err := api.GetWireguardPeersIterator()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if !reflect.DeepEqual(peers.ToList(), peerFixture) {
+		t.Errorf("got unexpected result, wanted %+v, got %+v", peers.ToList(), peerFixture)
+	}
+
+	// Test next()
+	peer := peers.Next()
+	if peer == nil {
+		t.Fatalf("peer iterator returned nil when we expected element to exist.")
+	}
+
+	if !reflect.DeepEqual(*peer, peerFixture[0]) {
+		t.Errorf("got unexpected result, wanted %+v, got %+v", *peer, peerFixture[0])
+	}
+
+	peer = peers.Next()
+	if peer != nil {
+		t.Fatalf("peer iterator returned non-nil when we expected it to be empty.")
+	}
+
+}
+
 func TestPostWireguardPeers(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
