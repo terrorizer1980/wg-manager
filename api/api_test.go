@@ -2,8 +2,10 @@ package api_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"net/http"
@@ -127,27 +129,42 @@ func TestGetWireguardPeerIterator(t *testing.T) {
 	}
 
 	// Get peer iterator
-	peers, err := api.GetWireguardPeersIterator()
+	peersIterator, err := api.GetWireguardPeersIterator()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	if !reflect.DeepEqual(peers.ToList(), peerFixture) {
-		t.Errorf("got unexpected result, wanted %+v, got %+v", peers.ToList(), peerFixture)
+	peers, err := peersIterator.ToList()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if !reflect.DeepEqual(peers, peerFixture) {
+		t.Errorf("got unexpected result, wanted %+v, got %+v", peers, peerFixture)
+	}
+
+	peersIterator, err = api.GetWireguardPeersIterator()
+	if err != nil {
+		t.Fatalf(err.Error())
 	}
 
 	// Test next()
-	peer := peers.Next()
-	if peer == nil {
-		t.Fatalf("peer iterator returned nil when we expected element to exist.")
+	peer, err := peersIterator.Next()
+	if err != nil {
+		t.Fatalf(err.Error())
+		t.Fatalf("Could not get peer eventhough we expect one to be present.")
 	}
 
-	if !reflect.DeepEqual(*peer, peerFixture[0]) {
-		t.Errorf("got unexpected result, wanted %+v, got %+v", *peer, peerFixture[0])
+	if !reflect.DeepEqual(peer, peerFixture[0]) {
+		t.Errorf("got unexpected result, wanted %+v, got %+v", peer, peerFixture[0])
 	}
 
-	peer = peers.Next()
-	if peer != nil {
+	if peersIterator.More() {
+		t.Fatalf("Expected peers to not present more objects.")
+	}
+
+	peer, err = peersIterator.Next()
+	if err == nil {
 		t.Fatalf("peer iterator returned non-nil when we expected it to be empty.")
 	}
 
@@ -195,4 +212,76 @@ func TestPostWireguardPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+}
+
+func TestWireguardPeerMemoryUsage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping long running test")
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Write(generatePeers(2000000))
+	}))
+
+	// Close the server when test finishes
+	defer server.Close()
+
+	// Use Client & URL from our local test server
+	api := api.API{
+		BaseURL:       server.URL,
+		Client:        server.Client(),
+		Username:      "foo",
+		Password:      "bar",
+		Hostname:      "test",
+		PeerCachePath: "/tmp/wg-manager-peer-list.json",
+	}
+
+	// First get peers from the api with cities present.
+	peers, err := api.GetWireguardPeersIterator()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	runtime.GC()
+
+	for peers.More() {
+		peer, _ := peers.Next()
+		if peer.Pubkey == "" {
+			t.Fatalf("Key not correct")
+		}
+	}
+
+	m := getMemUsage()
+	fmt.Printf("%d", bToMb(m.Alloc))
+}
+
+func getMemUsage() *runtime.MemStats {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return &m
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+
+func generatePeers(n int) []byte {
+
+	ret := make([]byte, 0, n*50)
+
+	ret = append(ret, byte('['))
+	i := 1
+	for i < n {
+		ret = append(
+			ret,
+			[]byte(`{"ipv4":"10.99.0.1/32","ipv6":"fc00:bbbb:bbbb:bb01::1/128","ports":[1234,4321],"cities":[null,"se-got"],"pubkey":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)...,
+		)
+		if i+1 < n {
+			ret = append(ret, byte(','))
+		}
+		i++
+	}
+	ret = append(ret, byte(']'))
+
+	return ret
 }

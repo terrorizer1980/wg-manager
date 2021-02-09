@@ -34,28 +34,43 @@ type WireguardPeer struct {
 
 // WireguardPeerIterator can be used to more efficiently work with large numbers of wireguard peers.
 type WireguardPeerIterator struct {
-	Peers   WireguardPeerList
-	counter int
+	peerDecoder *json.Decoder
 }
 
 // ConnectedKeysMap contains connected keys and their respective number of keys
 type ConnectedKeysMap map[string]int
 
 // Next() will return the next element in the iterator if there are any more elements.
-func (wpi *WireguardPeerIterator) Next() *WireguardPeer {
-	if wpi.counter >= len(wpi.Peers) {
-		return nil
+func (wpi *WireguardPeerIterator) Next() (WireguardPeer, error) {
+	var ret WireguardPeer
+
+	// Try to decode
+	err := wpi.peerDecoder.Decode(&ret)
+	if err != nil {
+		return WireguardPeer{}, err
 	}
+	return ret, nil
+}
 
-	ret := wpi.Peers[wpi.counter]
-	wpi.counter++
-
-	return &ret
+func (wpi *WireguardPeerIterator) More() bool {
+	return wpi.peerDecoder.More()
 }
 
 // ToList will convert the iterator (or what is left) into a WireguardPeerList
-func (wpi *WireguardPeerIterator) ToList() WireguardPeerList {
-	return wpi.Peers
+func (wpi *WireguardPeerIterator) ToList() (WireguardPeerList, error) {
+	// Do not take into account what happens if we don't have the full data available.
+	peers := make(WireguardPeerList, 0, 10)
+	for wpi.More() {
+		peer, err := wpi.Next()
+
+		if err != nil {
+			return WireguardPeerList{}, err
+		}
+
+		peers = append(peers, peer)
+	}
+
+	return peers, nil
 }
 
 // updateWireguardPeerCache fetches the list of peers from the api and stored it locally.
@@ -125,21 +140,23 @@ func (a *API) GetWireguardPeersIterator() (WireguardPeerIterator, error) {
 	if err != nil {
 		return WireguardPeerIterator{}, err
 	}
-	defer a.clearWireguardPeerCache()
 
-	content, err := ioutil.ReadFile(a.PeerCachePath)
+	cache, err := os.Open(a.PeerCachePath)
 	if err != nil {
 		return WireguardPeerIterator{}, err
 	}
 
-	var decodedResponse WireguardPeerList
-	err = json.Unmarshal(content, &decodedResponse)
+	dec := json.NewDecoder(cache)
+
+	token, err := dec.Token()
 	if err != nil {
-		return WireguardPeerIterator{}, fmt.Errorf("error decoding wireguard peers")
+		return WireguardPeerIterator{}, err
+	}
+	if token != json.Token(json.Delim('[')) {
+		return WireguardPeerIterator{}, fmt.Errorf("json for wireguard iterator is not an array")
 	}
 
-	return WireguardPeerIterator{Peers: decodedResponse}, nil
-
+	return WireguardPeerIterator{peerDecoder: dec}, nil
 }
 
 // PostWireguardConnections posts the number of connected wireguard keys to the API
