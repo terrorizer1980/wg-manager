@@ -124,7 +124,7 @@ func main() {
 		Channel:  *mqChannel,
 		Metrics:  metrics,
 	}
-	eventChannel := make(chan subscriber.WireguardEvent)
+	eventChannel := make(chan subscriber.WireguardEvent, 1024)
 	defer close(eventChannel)
 
 	err = s.Subscribe(shutdownCtx, eventChannel)
