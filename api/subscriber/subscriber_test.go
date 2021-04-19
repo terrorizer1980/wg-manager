@@ -74,7 +74,7 @@ func TestSubscriber(t *testing.T) {
 		Metrics:  metrics,
 	}
 
-	channel := make(chan subscriber.WireguardEvent)
+	channel := make(chan subscriber.WireguardEvent, 1024)
 	defer close(channel)
 
 	ctx, cancel := context.WithCancel(context.Background())
