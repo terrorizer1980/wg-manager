@@ -165,7 +165,7 @@ func handleEvent(event subscriber.WireguardEvent) {
 		t = metrics.NewTiming()
 		pf.AddPortforwarding(event.Peer)
 		t.Send("add_event_add_portforwarding_time")
-	case "REMOVE":
+	case "REMOVE_TEST":
 		t := metrics.NewTiming()
 		wg.RemovePeer(event.Peer)
 		t.Send("remove_event_remove_peer_time")
