@@ -42,6 +42,69 @@ func New(interfaces []string, metrics *statsd.Client) (*Wireguard, error) {
 	}, nil
 }
 
+func (w *Wireguard) ResetPeers() {
+	for _, d := range w.interfaces {
+		removePeers := []wgtypes.PeerConfig{}
+		addPeers := []wgtypes.PeerConfig{}
+		dev, err := w.client.Device(d)
+		if err != nil {
+			// TODO: Add some kind of useful error message
+			continue
+		}
+		peers := dev.Peers
+		for _, peer := range peers {
+			if needsReset(peer) {
+				// Remove peers that's previously been active and should be reset to remove data
+				removePeers = append(removePeers, wgtypes.PeerConfig{
+					PublicKey: peer.PublicKey,
+					Remove:    true,
+				})
+
+				// Copy the preshared key if one is set
+				var emptyKey wgtypes.Key
+				var copiedKey wgtypes.Key
+				// TODO: Can we just get rid of presharedkey handling alltogether?
+				if peer.PresharedKey != emptyKey {
+					// TODO: Is this still the case? Perhaps it's now fixed upstream?
+					// We need to copy the key, or the pointer gets corrupted for some reason
+					copy(copiedKey[:], peer.PresharedKey[:])
+				}
+
+				addPeers = append(addPeers, wgtypes.PeerConfig{
+					PublicKey:         peer.PublicKey,
+					ReplaceAllowedIPs: true,
+					PresharedKey:      &copiedKey,
+					AllowedIPs:        peer.AllowedIPs,
+				})
+			}
+		}
+		// No changes needed
+		if len(removePeers) == 0 {
+			continue
+		}
+
+		// Add new peers, remove deleted peers, and remove peers should be reset
+		err = w.client.ConfigureDevice(d, wgtypes.Config{
+			Peers: removePeers,
+		})
+
+		if err != nil {
+			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
+			continue
+		}
+
+		// Re-add the peers we removed to reset in the previous step
+		err = w.client.ConfigureDevice(d, wgtypes.Config{
+			Peers: addPeers,
+		})
+
+		if err != nil {
+			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
+			continue
+		}
+	}
+}
+
 // UpdatePeers updates the configuration of the wireguard interfaces to match the given list of peers
 func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList api.ConnectedKeysMap) {
 	peerMap := w.mapPeers(peers)
@@ -72,7 +135,6 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList a
 
 		existingPeerMap := mapExistingPeers(device.Peers)
 		cfgPeers := []wgtypes.PeerConfig{}
-		resetPeers := []wgtypes.PeerConfig{}
 
 		// Loop through peers from the API
 		// Add peers not currently existing in the wireguard config
@@ -89,37 +151,13 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList a
 		}
 
 		// Loop through the current peers in the wireguard config
-		for key, peer := range existingPeerMap {
+		for key := range existingPeerMap {
 			if _, ok := peerMap[key]; !ok {
 				// Remove peers that doesn't exist in the API
 				cfgPeers = append(cfgPeers, wgtypes.PeerConfig{
 					PublicKey: key,
 					Remove:    true,
 				})
-			} else if needsReset(peer) {
-				// Remove peers that's previously been active and should be reset to remove data
-				cfgPeers = append(cfgPeers, wgtypes.PeerConfig{
-					PublicKey: key,
-					Remove:    true,
-				})
-
-				peerCfg := wgtypes.PeerConfig{
-					PublicKey:         key,
-					ReplaceAllowedIPs: true,
-					AllowedIPs:        peer.AllowedIPs,
-				}
-
-				// Copy the preshared key if one is set
-				var emptyKey wgtypes.Key
-				if peer.PresharedKey != emptyKey {
-					// We need to copy the key, or the pointer gets corrupted for some reason
-					var copiedKey wgtypes.Key
-					copy(copiedKey[:], peer.PresharedKey[:])
-					peerCfg.PresharedKey = &copiedKey
-				}
-
-				// Re-add the peer later
-				resetPeers = append(resetPeers, peerCfg)
 			}
 		}
 
@@ -138,20 +176,6 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList a
 			continue
 		}
 
-		// No peers to re-add for reset
-		if len(resetPeers) == 0 {
-			continue
-		}
-
-		// Re-add the peers we removed to reset in the previous step
-		err = w.client.ConfigureDevice(d, wgtypes.Config{
-			Peers: resetPeers,
-		})
-
-		if err != nil {
-			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
-			continue
-		}
 	}
 
 	// Send metrics

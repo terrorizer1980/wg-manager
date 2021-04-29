@@ -32,7 +32,8 @@ var (
 
 func main() {
 	// Set up commandline flags
-	interval := flag.Duration("interval", time.Minute, "how often wireguard peers will be synchronized with the api")
+	synchronizationInterval := flag.Duration("synchronization-interval", time.Minute, "how often wireguard peers will be synchronized with the api")
+	resetHandshakeInterval := flag.Duration("reset-handshake-interval", time.Minute, "how often wireguard peers will have their handshakes checked for resets")
 	delay := flag.Duration("delay", time.Second*45, "max random delay for the synchronization")
 	apiTimeout := flag.Duration("api-timeout", time.Second*30, "max duration for API requests")
 	url := flag.String("url", "https://example.com", "api url")
@@ -133,18 +134,22 @@ func main() {
 	}
 
 	// Create a ticker to run our logic for polling the api and updating wireguard peers
-	ticker := jitter.NewTicker(*interval, *delay)
+	synchronizationTicker := jitter.NewTicker(*synchronizationInterval, *delay)
+	resetHandshakeTicker := jitter.NewTicker(*resetHandshakeInterval, 0)
 	go func() {
 		for {
 			select {
 			case msg := <-eventChannel:
 				handleEvent(msg)
-			case <-ticker.C:
+			case <-synchronizationTicker.C:
 				// We run this synchronously, the ticker will drop ticks if this takes too long
 				// This way we don't need a mutex or similar to ensure it doesn't run concurrently either
 				synchronize()
+			case <-resetHandshakeTicker.C:
+
 			case <-shutdownCtx.Done():
-				ticker.Stop()
+				synchronizationTicker.Stop()
+				resetHandshakeTicker.Stop()
 				return
 			}
 		}
@@ -208,6 +213,11 @@ func synchronize() {
 		return
 	}
 	t.Send("post_wireguard_connections_time")
+}
+
+func resetHandshake() {
+	defer metrics.NewTiming().Send("resethandshake_time")
+	wg.ResetPeers()
 }
 
 func waitForInterrupt(ctx context.Context) error {
