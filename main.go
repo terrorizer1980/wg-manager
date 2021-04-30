@@ -146,7 +146,7 @@ func main() {
 				// This way we don't need a mutex or similar to ensure it doesn't run concurrently either
 				synchronize()
 			case <-resetHandshakeTicker.C:
-
+				resetHandshake()
 			case <-shutdownCtx.Done():
 				synchronizationTicker.Stop()
 				resetHandshakeTicker.Stop()
