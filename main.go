@@ -32,6 +32,7 @@ var (
 
 func main() {
 	// Set up commandline flags
+	countPeerInterval := flag.Duration("count-peer-interval", time.Minute, "how often wireguard peers will be counted and reported to statsd and the api")
 	synchronizationInterval := flag.Duration("synchronization-interval", time.Minute, "how often wireguard peers will be synchronized with the api")
 	resetHandshakeInterval := flag.Duration("reset-handshake-interval", time.Minute, "how often wireguard peers will have their handshakes checked for resets")
 	delay := flag.Duration("delay", time.Second*45, "max random delay for the synchronization")
@@ -134,13 +135,16 @@ func main() {
 	}
 
 	// Create a ticker to run our logic for polling the api and updating wireguard peers
+	countPeersTicker := jitter.NewTicker(*countPeerInterval, time.Microsecond)
 	synchronizationTicker := jitter.NewTicker(*synchronizationInterval, *delay)
-	resetHandshakeTicker := jitter.NewTicker(*resetHandshakeInterval, 0)
+	resetHandshakeTicker := jitter.NewTicker(*resetHandshakeInterval, time.Microsecond)
 	go func() {
 		for {
 			select {
 			case msg := <-eventChannel:
 				handleEvent(msg)
+			case <-countPeersTicker.C:
+				countPeers()
 			case <-synchronizationTicker.C:
 				// We run this synchronously, the ticker will drop ticks if this takes too long
 				// This way we don't need a mutex or similar to ensure it doesn't run concurrently either
@@ -148,6 +152,7 @@ func main() {
 			case <-resetHandshakeTicker.C:
 				resetHandshake()
 			case <-shutdownCtx.Done():
+				countPeersTicker.Stop()
 				synchronizationTicker.Stop()
 				resetHandshakeTicker.Stop()
 				return
@@ -183,6 +188,11 @@ func handleEvent(event subscriber.WireguardEvent) {
 		t.Send("update_ports_event_update_portforwarding_time")
 	default: // Bad data from the API, ignore it
 	}
+}
+
+func countPeers() {
+	defer metrics.NewTiming().Send("countpeers_time")
+	wg.CountPeers()
 }
 
 func synchronize() {

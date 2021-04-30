@@ -105,6 +105,38 @@ func (w *Wireguard) ResetPeers() {
 	}
 }
 
+func (w *Wireguard) CountPeers() (connectedKeyList api.ConnectedKeysMap) {
+	var peerCount, devicePeerCount int
+	connectedKeysMap := make(api.ConnectedKeysMap)
+	for _, d := range w.interfaces {
+		var deviceConnectedKeys []string
+
+		device, err := w.client.Device(d)
+		// Log an error, but move on, so that one broken wireguard interface doesn't prevent us from configuring the rest
+		if err != nil {
+			log.Printf("error connecting to wireguard interface %s: %s", d, err.Error())
+			continue
+		}
+
+		devicePeerCount, deviceConnectedKeys = countConnectedPeers(device.Peers)
+		peerCount += devicePeerCount
+
+		for _, deviceKey := range deviceConnectedKeys {
+			if _, ok := connectedKeysMap[deviceKey]; !ok {
+				connectedKeysMap[deviceKey] = 1
+			} else {
+				// If the key already exists, count as another connection
+				connectedKeysMap[deviceKey] = connectedKeysMap[deviceKey] + 1
+			}
+		}
+
+	}
+
+	// Send metrics
+	w.metrics.Gauge("connected_peers", peerCount)
+	return connectedKeysMap
+}
+
 // UpdatePeers updates the configuration of the wireguard interfaces to match the given list of peers
 func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) (connectedKeyList api.ConnectedKeysMap) {
 	peerMap := w.mapPeers(peers)
