@@ -179,6 +179,23 @@ func TestWireguard(t *testing.T) {
 		}
 	})
 
+	t.Run("reset handshakes", func(t *testing.T) {
+		// Since we do not connect with any peers this should do nothing
+		wg.ResetPeers()
+
+		device, err := client.Device(testInterface)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		peerFixture[0].AllowedIPs[0].IP = net.ParseIP("10.99.0.2")
+		peerFixture[0].AllowedIPs[1].IP = net.ParseIP("fc00:bbbb:bbbb:bb01::2")
+
+		if diff := cmp.Diff(peerFixture, device.Peers); diff != "" {
+			t.Fatalf("unexpected peers (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("remove peers", func(t *testing.T) {
 		wg.UpdatePeers(api.WireguardPeerList{})
 
