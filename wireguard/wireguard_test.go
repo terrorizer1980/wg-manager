@@ -130,13 +130,12 @@ func TestWireguard(t *testing.T) {
 	defer wg.Close()
 
 	t.Run("check connected keys", func(t *testing.T) {
-		connectedKeys := wg.UpdatePeers(apiFixture)
+		wg.UpdatePeers(apiFixture)
 
-		expectedKeys := api.ConnectedKeysMap{
-			wgClientPrivkey.PublicKey().String(): 1,
-		}
+		// Since we do not get any handshakes from any peers, this should return nothing
+		connectedKeys, _ := wg.CountPeers()
 
-		if diff := cmp.Diff(expectedKeys, connectedKeys); diff != "" {
+		if diff := cmp.Diff(api.ConnectedKeysMap{}, connectedKeys); diff != "" {
 			t.Fatalf("unexpected keys (-want +got):\n%s", diff)
 		}
 	})
