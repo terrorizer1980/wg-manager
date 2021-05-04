@@ -48,7 +48,7 @@ func (w *Wireguard) ResetPeers() {
 		addPeers := []wgtypes.PeerConfig{}
 		dev, err := w.client.Device(d)
 		if err != nil {
-			// TODO: Add some kind of useful error message
+			log.Printf("error connecting to wireguard interface %s: %s", d, err.Error())
 			continue
 		}
 		peers := dev.Peers
@@ -83,7 +83,7 @@ func (w *Wireguard) ResetPeers() {
 			continue
 		}
 
-		// Add new peers, remove deleted peers, and remove peers should be reset
+		// Remove peers that should be reset
 		err = w.client.ConfigureDevice(d, wgtypes.Config{
 			Peers: removePeers,
 		})
