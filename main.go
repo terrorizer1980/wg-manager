@@ -94,7 +94,7 @@ func main() {
 
 	interfacesList := strings.Split(*interfaces, ",")
 
-	wg, err = wireguard.New(interfacesList, metrics)
+	wg, err = wireguard.New(interfacesList)
 	if err != nil {
 		log.Fatalf("error initializing wireguard %s", err)
 	}
@@ -195,7 +195,19 @@ func handleEvent(event subscriber.WireguardEvent) {
 
 func countPeers() {
 	defer metrics.NewTiming().Send("countpeers_time")
-	wg.CountPeers()
+	connectedKeys, peerCount := wg.CountPeers()
+
+	// Send connected peers metric
+	metrics.Gauge("connected_peers", peerCount)
+
+	t := metrics.NewTiming()
+	err := a.PostWireguardConnections(connectedKeys)
+	if err != nil {
+		metrics.Increment("error_posting_connections")
+		log.Printf("error posting connections %s", err.Error())
+		return
+	}
+	t.Send("post_wireguard_connections_time")
 }
 
 func synchronize() {
@@ -211,21 +223,12 @@ func synchronize() {
 	t.Send("get_wireguard_peers_time")
 
 	t = metrics.NewTiming()
-	connectedKeys := wg.UpdatePeers(peers)
+	wg.UpdatePeers(peers)
 	t.Send("update_peers_time")
 
 	t = metrics.NewTiming()
 	pf.UpdatePortforwarding(peers)
 	t.Send("update_portforwarding_time")
-
-	t = metrics.NewTiming()
-	err = a.PostWireguardConnections(connectedKeys)
-	if err != nil {
-		metrics.Increment("error_posting_connections")
-		log.Printf("error posting connections %s", err.Error())
-		return
-	}
-	t.Send("post_wireguard_connections_time")
 }
 
 func resetHandshake() {

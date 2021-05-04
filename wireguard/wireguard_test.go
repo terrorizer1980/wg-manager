@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/infosum/statsd"
 	"github.com/mullvad/wg-manager/api"
 	"github.com/mullvad/wg-manager/wireguard"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -61,11 +60,6 @@ func wgKey() wgtypes.Key {
 func TestWireguard(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration tests")
-	}
-
-	metrics, err := statsd.New()
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	client, err := wgctrl.New()
@@ -129,7 +123,7 @@ func TestWireguard(t *testing.T) {
 	// Sleep so that there's time for a handshake between the peers
 	time.Sleep(time.Second * 2)
 
-	wg, err := wireguard.New([]string{testInterface}, metrics)
+	wg, err := wireguard.New([]string{testInterface})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +249,7 @@ func TestInvalidInterface(t *testing.T) {
 
 	interfaceName := "nonexistant"
 
-	_, err := wireguard.New([]string{interfaceName}, nil)
+	_, err := wireguard.New([]string{interfaceName})
 	if err == nil {
 		t.Fatal("no error")
 	}
