@@ -118,6 +118,9 @@ func main() {
 	// Run an initial synchronization
 	synchronize()
 
+	// Run an initial count of peers
+	countPeers()
+
 	// Set up a connection to receive add/remove events
 	s := subscriber.Subscriber{
 		Username: *mqUsername,
