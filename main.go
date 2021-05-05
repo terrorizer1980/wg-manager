@@ -152,6 +152,7 @@ func main() {
 				// We run this synchronously, the ticker will drop ticks if this takes too long
 				// This way we don't need a mutex or similar to ensure it doesn't run concurrently either
 				synchronize()
+				metrics.Gauge("eventchannel_length", len(eventChannel))
 			case <-resetHandshakeTicker.C:
 				resetHandshake()
 			case <-shutdownCtx.Done():
