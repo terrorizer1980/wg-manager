@@ -57,20 +57,9 @@ func (w *Wireguard) ResetPeers() {
 					Remove:    true,
 				})
 
-				// Copy the preshared key if one is set
-				var emptyKey wgtypes.Key
-				var copiedKey wgtypes.Key
-				// TODO: Can we just get rid of presharedkey handling alltogether?
-				if peer.PresharedKey != emptyKey {
-					// TODO: Is this still the case? Perhaps it's now fixed upstream?
-					// We need to copy the key, or the pointer gets corrupted for some reason
-					copy(copiedKey[:], peer.PresharedKey[:])
-				}
-
 				addPeers = append(addPeers, wgtypes.PeerConfig{
 					PublicKey:         peer.PublicKey,
 					ReplaceAllowedIPs: true,
-					PresharedKey:      &copiedKey,
 					AllowedIPs:        peer.AllowedIPs,
 				})
 			}
