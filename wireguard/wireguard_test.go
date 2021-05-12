@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/infosum/statsd"
 	"github.com/mullvad/wg-manager/api"
 	"github.com/mullvad/wg-manager/wireguard"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -61,11 +60,6 @@ func wgKey() wgtypes.Key {
 func TestWireguard(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration tests")
-	}
-
-	metrics, err := statsd.New()
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	client, err := wgctrl.New()
@@ -129,20 +123,19 @@ func TestWireguard(t *testing.T) {
 	// Sleep so that there's time for a handshake between the peers
 	time.Sleep(time.Second * 2)
 
-	wg, err := wireguard.New([]string{testInterface}, metrics)
+	wg, err := wireguard.New([]string{testInterface})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer wg.Close()
 
 	t.Run("check connected keys", func(t *testing.T) {
-		connectedKeys := wg.UpdatePeers(apiFixture)
+		wg.UpdatePeers(apiFixture)
 
-		expectedKeys := api.ConnectedKeysMap{
-			wgClientPrivkey.PublicKey().String(): 1,
-		}
+		// Since we do not get any handshakes from any peers, this should return nothing
+		connectedKeys, _ := wg.CountPeers()
 
-		if diff := cmp.Diff(expectedKeys, connectedKeys); diff != "" {
+		if diff := cmp.Diff(api.ConnectedKeysMap{}, connectedKeys); diff != "" {
 			t.Fatalf("unexpected keys (-want +got):\n%s", diff)
 		}
 	})
@@ -165,6 +158,23 @@ func TestWireguard(t *testing.T) {
 		apiFixture[0].IPv4 = "10.99.0.2/32"
 		apiFixture[0].IPv6 = "fc00:bbbb:bbbb:bb01::2/128"
 		wg.UpdatePeers(apiFixture)
+
+		device, err := client.Device(testInterface)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		peerFixture[0].AllowedIPs[0].IP = net.ParseIP("10.99.0.2")
+		peerFixture[0].AllowedIPs[1].IP = net.ParseIP("fc00:bbbb:bbbb:bb01::2")
+
+		if diff := cmp.Diff(peerFixture, device.Peers); diff != "" {
+			t.Fatalf("unexpected peers (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("reset handshakes", func(t *testing.T) {
+		// Since we do not connect with any peers this should do nothing
+		wg.ResetPeers()
 
 		device, err := client.Device(testInterface)
 		if err != nil {
@@ -238,7 +248,7 @@ func TestInvalidInterface(t *testing.T) {
 
 	interfaceName := "nonexistant"
 
-	_, err := wireguard.New([]string{interfaceName}, nil)
+	_, err := wireguard.New([]string{interfaceName})
 	if err == nil {
 		t.Fatal("no error")
 	}
