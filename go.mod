@@ -3,7 +3,7 @@ module github.com/mullvad/wg-manager
 go 1.15
 
 require (
-	github.com/mullvad/jitter v0.0.0-20190312004500-d77fd504dcfa
+	github.com/DMarby/jitter v0.0.0-20190312004500-d77fd504dcfa
 	github.com/coreos/go-iptables v0.6.0
 	github.com/digineo/go-ipset/v2 v2.2.1
 	github.com/google/go-cmp v0.5.5
